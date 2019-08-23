@@ -230,13 +230,14 @@ function addTeamsSection(sheet, points, team) {
 
         assignees = teamName.split(/\s*,\s*/);
         teamCommitments = getTeamCommitments(teamData.sprints[sprintName].commitments, assignees);
-        for (var assignee, commitment, points, k = 0, l = assignees.length; k < l; ++k) {
+        for (var assignee, assigneeAvailability, commitment, points, k = 0, l = assignees.length; k < l; ++k) {
           assignee = assignees[k];
+          assigneeAvailability = getAvailability(assignee, sprintName, team);
           commitment = teamCommitments[assignee] / 100;
           points = parseInt(sheet.getRange(ASSIGNEE_ROW_MAP[assignee], SPRINT_COLUMN_MAP[sprintName], 1, 1).getValue(), 10);
           // Logger.log("Adding points to team " + teamName + " for sprint " +
-          //   sprintName + " obo " + assignee + ": " + points + "x" + commitment);
-          teamPoints += (points * commitment);
+          //   sprintName + " obo " + assignee + ": " + points + "x" + assigneeAvailability + "x" + commitment);
+          teamPoints += ((points * assigneeAvailability) * commitment);
         }
       }
 

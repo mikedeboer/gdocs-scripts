@@ -99,6 +99,18 @@ function getAvailabilityPerCountry(team, sprints) {
   return countryData;
 }
 
+function getAvailability(name, sprint, team) {
+  var assignees = Object.keys(team);
+  for (var assignee, i = 0, l = assignees.length; i < l; ++i) {
+    assignee = assignees[i];
+    if (team[assignee].name != name) {
+      continue;
+    }
+    return team[assignee].sprintsAvailability[sprint] || 1;
+  }
+  return 1;
+}
+
 function correctCommitments(teams) {
   var membersChecked = {};
   for (var teamMembers, i = 0, l = teams.commitments.length; i < l; ++i) {
