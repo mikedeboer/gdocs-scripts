@@ -1,3 +1,8 @@
+var AVAILABILITY_BOOSTS = {
+  holiday: 1,
+  pto: 1,
+  work_week: 1
+};
 var SPRINT_NAMES = [];
 var SPRINT_LENGTH = 10; // days.
 
@@ -54,16 +59,17 @@ function addAvailabilityData(team) {
   var assignees = Object.keys(team);
   for (var member, factors, i = 0, l = assignees.length; i < l; ++i) {
     member = team[assignees[i]];
-    member.availability = member.workWeek / 40;
+    member.availability = (member.workWeek / 40) * AVAILABILITY_BOOSTS.work_week;
 
     member.sprintsAvailability = {};
-    for (var daysLeft, sprint, j = 0, l2 = sprints.length; j < l2; ++j) {
+    for (var daysLeft, sprint, holidays, j = 0, l2 = sprints.length; j < l2; ++j) {
       daysLeft = SPRINT_LENGTH * member.availability;
       sprint = sprints[j];
-      if (countryData[member.country] && countryData[member.country][sprint]) {
-        daysLeft -= countryData[member.country][sprint];
+      holidays = countryData[member.country] && countryData[member.country][sprint];
+      if (holidays) {
+        daysLeft -= holidays * AVAILABILITY_BOOSTS.holiday;
       }
-      daysLeft -= (sheet.getRange(startRow + i, j + 2).getValue() || 0);
+      daysLeft -= (sheet.getRange(startRow + i, j + 2).getValue() || 0) * AVAILABILITY_BOOSTS.pto;
       member.sprintsAvailability[sprint] = Math.max(daysLeft, 0) / SPRINT_LENGTH;
     }
   }

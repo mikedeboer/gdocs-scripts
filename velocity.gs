@@ -124,10 +124,11 @@ function generateSheet(points, team) {
   var sprintNames = Object.keys(points);
   var sprintCount = sprintNames.length;
   var visitedRanges = {};
-  for (var sprintName, assigneeEmails, assigneeCount, sprintColumn, i = 0; i < sprintCount; ++i) {
+  for (var sprintName, assigneeEmails, assigneeCount, tableOffset, sprintColumn, i = 0; i < sprintCount; ++i) {
     sprintName = sprintNames[i];
     assigneeEmails = Object.keys(points[sprintName]);
     assigneeCount = assigneeEmails.length;
+    tableOffset = assigneeCount + 4;
     sprintColumn = i + 2;
 
     if (!visitedRanges["1," + sprintColumn]) {
@@ -135,7 +136,14 @@ function generateSheet(points, team) {
       sheet.getRange(1, sprintColumn, 1, 1).setValue(sprintName);
       SPRINT_COLUMN_MAP[sprintName] = sprintColumn;
       var A1RangeSprintTotal = ALPHA[i + 1] + "2:" + ALPHA[i + 1] + (assigneeCount + 1);
-      sheet.getRange(assigneeEmails.length + 3, sprintColumn, 1, 1).setValue("=SUM(" + A1RangeSprintTotal + ")");
+      sheet.getRange(assigneeCount + 3, sprintColumn, 1, 1).setValue("=SUM(" + A1RangeSprintTotal + ")");
+
+      // Also set the labels for the table with relative velocity (sprint totals).
+      sheet.getRange(tableOffset + 1, sprintColumn, 1, 1).setValue(sprintName);
+      A1RangeSprintTotal = ALPHA[i + 1] + (tableOffset + 2) + ":" + ALPHA[i + 1] +
+        (tableOffset + assigneeCount + 1);
+      sheet.getRange(assigneeCount + tableOffset + 3, sprintColumn, 1, 1)
+        .setValue("=SUM(" + A1RangeSprintTotal + ")");
     }
 
     for (var assignee, assigneeRow, pointTotal, note, pointTypes, j = 0; j < assigneeCount; ++j) {
@@ -148,6 +156,11 @@ function generateSheet(points, team) {
         ASSIGNEE_ROW_MAP[team[assignee].name] = assigneeRow;
         var A1RangeAssigneeTotal = "B" + assigneeRow + ":" + ALPHA[sprintCount] + assigneeRow;
         sheet.getRange(assigneeRow, sprintCount + 3, 1, 1).setValue("=SUM(" + A1RangeAssigneeTotal + ")");
+
+        // Also set the labels for the table with relative velocity (assignee totals).
+        sheet.getRange(tableOffset + assigneeRow, 1, 1, 1).setValue(team[assignee].name);
+        var A1RangeAssigneeTotal = "B" + (tableOffset + assigneeRow) + ":" + ALPHA[sprintCount] + (tableOffset + assigneeRow);
+        sheet.getRange(tableOffset + assigneeRow, sprintCount + 3, 1, 1).setValue("=SUM(" + A1RangeAssigneeTotal + ")");
       }
 
       pointTotal = 0;
@@ -160,33 +173,42 @@ function generateSheet(points, team) {
         pointTotal += pointValue;
       }
       sheet.getRange(assigneeRow, sprintColumn, 1, 1).setValue(pointTotal);
+
+      // Also set the labels for the table with relative velocity.
+      sheet.getRange(tableOffset + assigneeRow, sprintColumn, 1, 1)
+        .setValue(pointTotal * (1 + (1 - getAvailability(team[assignee].name, sprintName, team))));
     }
   }
   return sheet;
 }
 
 function drawCharts(sheet, points, team) {
-  var sprints = Object.keys(points);
-  var assigneeEmails = Object.keys(team);
+  var sprintsCount = Object.keys(points).length;
+  var assigneeEmailsCount = Object.keys(team).length;
+  var chartsOffset = 9;
   // First, chart out the developments per sprint.
   var chart = sheet.newChart()
     .asLineChart()
-    .addRange(sheet.getRange("B1:" + ALPHA[sprints.length] + "1"))
-    .addRange(sheet.getRange("B" + (assigneeEmails.length + 3) + ":" + ALPHA[sprints.length] + (assigneeEmails.length + 3)))
+    .addRange(sheet.getRange("B1:" + ALPHA[sprintsCount] + "1"))
+    .addRange(sheet.getRange("B" + (assigneeEmailsCount + 3) + ":" +
+      ALPHA[sprintsCount] + (assigneeEmailsCount + 3)))
+    .addRange(sheet.getRange("B" + ((assigneeEmailsCount * 2) + 7) + ":" +
+      ALPHA[sprintsCount] + ((assigneeEmailsCount * 2) + 7)))
     .setMergeStrategy(Charts.ChartMergeStrategy.MERGE_ROWS)
     .setTransposeRowsAndColumns(true)
     .setXAxisTitle("Sprints")
     .setYAxisTitle("Points")
-    .setPosition(assigneeEmails.length + 5, assigneeEmails.length + 5, -1000, 0)
+    .setPosition((assigneeEmailsCount * 2) + chartsOffset, 2, 0, 0)
     .build();
   sheet.insertChart(chart);
 
   // Next, chart out the developments per assignee.
   chart = sheet.newChart()
     .asPieChart()
-    .addRange(sheet.getRange("A2:A" + (assigneeEmails.length + 1)))
-    .addRange(sheet.getRange(ALPHA[sprints.length + 2] + "2:" + ALPHA[sprints.length + 2] + (assigneeEmails.length + 1)))
-    .setPosition(assigneeEmails.length + 5, assigneeEmails.length + 5, -350, 0)
+    .addRange(sheet.getRange("A2:A" + (assigneeEmailsCount + 1)))
+    .addRange(sheet.getRange(ALPHA[sprintsCount + 2] + "2:" +
+      ALPHA[sprintsCount + 2] + (assigneeEmailsCount + 1)))
+    .setPosition((assigneeEmailsCount * 2) + chartsOffset, 9, 0, 0)
     .build();
   sheet.insertChart(chart);
 }
@@ -195,7 +217,7 @@ function addTeamsSection(sheet, points, team) {
   var teamData = getTeamData();
   //Logger.log("TEAMS:: " + JSON.stringify(teamData, null, 2));
 
-  var mainTableSpan = Object.keys(team).length + 4;
+  var mainTableSpan = (Object.keys(team).length * 2) + 8;
   var chartsRowSpan = 19;
   var tableRowOffset = mainTableSpan + chartsRowSpan;
 
@@ -232,7 +254,7 @@ function addTeamsSection(sheet, points, team) {
         teamCommitments = getTeamCommitments(teamData.sprints[sprintName].commitments, assignees);
         for (var assignee, assigneeAvailability, commitment, points, k = 0, l = assignees.length; k < l; ++k) {
           assignee = assignees[k];
-          assigneeAvailability = getAvailability(assignee, sprintName, team);
+          assigneeAvailability = 1 + (1 - getAvailability(assignee, sprintName, team));
           commitment = teamCommitments[assignee] / 100;
           points = parseInt(sheet.getRange(ASSIGNEE_ROW_MAP[assignee], SPRINT_COLUMN_MAP[sprintName], 1, 1).getValue(), 10);
           // Logger.log("Adding points to team " + teamName + " for sprint " +
