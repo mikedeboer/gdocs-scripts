@@ -188,7 +188,7 @@ function getTeamData() {
   };
 }
 
-function getTeamCommitments(teams, assignees){
+function getTeamCommitments(teams, assignees) {
   for (var team, present, i = 0, l = teams.length; i < l; ++i) {
     team = teams[i];
     if (Object.keys(team).length != assignees.length) {

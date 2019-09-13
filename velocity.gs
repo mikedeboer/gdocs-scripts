@@ -41,10 +41,8 @@ function generateVelocity() {
   var root = XmlService.parse(html).getRootElement();
 
   var points = getPoints(root, Object.keys(team));
-  var sheet = generateSheet(points, team);
-  drawCharts(sheet, points, team);
-
-  addTeamsSection(sheet, points, team);
+  var teamData = getTeamData();
+  generateSheet(points, team, teamData);
 }
 
 function getSprints(root) {
@@ -129,7 +127,7 @@ function getPoints(root, assignees) {
   return pointsMap;
 }
 
-function generateSheet(points, team) {
+function generateSheet(points, team, teamData) {
   var spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
   var sheetName = "Velocity - generated at " + (new Date()).toDateString();
   var sheet = spreadsheet.getSheetByName(sheetName);
@@ -137,26 +135,38 @@ function generateSheet(points, team) {
     spreadsheet.deleteSheet(sheet);
   }
   sheet = spreadsheet.insertSheet(sheetName);
+
+  var assigneeEmailsCount = Object.keys(team).length;
+  var teamCount = teamData.names.length;
+  var chartsOffset = 19;
+  var startRow = (assigneeEmailsCount * 2) + (teamCount * 2) + (chartsOffset * 2) - 5;
+
+  addIndividualsSection(sheet, points, team, teamData, startRow);
+
+  addTeamsSection(sheet, points, team, teamData, startRow);
+}
+
+function addIndividualsSection(sheet, points, team, teamData, startRow) {
   var sprintNames = Object.keys(points);
   var sprintCount = sprintNames.length;
   var visitedRanges = {};
 
-  for (var sprintName, assigneeEmails, assigneeCount, tableOffset, sprintColumn, i = 0; i < sprintCount; ++i) {
+  for (var sprintName, assigneeEmails, assigneeCount, relativeVelocityTableOffset, sprintColumn, totalRow, i = 0; i < sprintCount; ++i) {
     sprintName = sprintNames[i];
     assigneeEmails = Object.keys(points[sprintName]);
     assigneeCount = assigneeEmails.length;
-    tableOffset = assigneeCount + 6;
+    relativeVelocityTableOffset = startRow + assigneeCount + 6;
     sprintColumn = i + 2;
 
-    if (!visitedRanges["1," + sprintColumn]) {
-      visitedRanges["1," + sprintColumn] = 1;
-      sheet.getRange(1, sprintColumn, 1, 1).setValue(sprintName);
+    if (!visitedRanges[startRow + "," + sprintColumn]) {
+      visitedRanges[startRow + "," + sprintColumn] = 1;
+      sheet.getRange(startRow + 1, sprintColumn, 1, 1).setValue(sprintName);
       SPRINT_COLUMN_MAP[sprintName] = sprintColumn;
-      var totalRow = assigneeCount + 4;
+      totalRow = startRow + assigneeCount + 4;
       sheet.getRange(totalRow - 1, 1, 1, 1).setValue(COLUMN_LABELS.totalMinus);
       sheet.getRange(totalRow, 1, 1, 1).setValue(COLUMN_LABELS.total);
       sheet.getRange(totalRow + 1, 1, 1, 1).setValue(COLUMN_LABELS.totalPlus);
-      var A1RangeSprintTotal = ALPHA[i + 1] + "2:" + ALPHA[i + 1] + (assigneeCount + 1);
+      var A1RangeSprintTotal = ALPHA[i + 1] + (startRow + 2) + ":" + ALPHA[i + 1] + (startRow + assigneeCount + 1);
       sheet.getRange(totalRow - 1, sprintColumn, 1, 1).setValue("=" +
         ALPHA[sprintColumn - 1] + totalRow + "-STDEV(" + A1RangeSprintTotal + ")");
       sheet.getRange(totalRow, sprintColumn, 1, 1).setValue("=SUM(" + A1RangeSprintTotal + ")");
@@ -166,13 +176,13 @@ function generateSheet(points, team) {
       sheet.hideRows(totalRow + 1);
 
       // Also set the labels for the table with relative velocity (sprint totals).
-      sheet.getRange(tableOffset + 1, sprintColumn, 1, 1).setValue(sprintName);
-      totalRow = assigneeCount + tableOffset + 4;
+      sheet.getRange(relativeVelocityTableOffset + 1, sprintColumn, 1, 1).setValue(sprintName);
+      totalRow = relativeVelocityTableOffset + assigneeCount + 4;
       sheet.getRange(totalRow - 1, 1, 1, 1).setValue(COLUMN_LABELS.totalMinus);
       sheet.getRange(totalRow, 1, 1, 1).setValue(COLUMN_LABELS.total);
       sheet.getRange(totalRow + 1, 1, 1, 1).setValue(COLUMN_LABELS.totalPlus);
-      A1RangeSprintTotal = ALPHA[i + 1] + (tableOffset + 2) + ":" + ALPHA[i + 1] +
-        (tableOffset + assigneeCount + 1);
+      A1RangeSprintTotal = ALPHA[i + 1] + (relativeVelocityTableOffset + 2) + ":" + ALPHA[i + 1] +
+        (relativeVelocityTableOffset + assigneeCount + 1);
       sheet.getRange(totalRow - 1, sprintColumn, 1, 1).setValue("=" +
         ALPHA[sprintColumn - 1] + totalRow + "-STDEV(" + A1RangeSprintTotal + ")");
       sheet.getRange(totalRow, sprintColumn, 1, 1).setValue("=SUM(" + A1RangeSprintTotal + ")");
@@ -186,33 +196,34 @@ function generateSheet(points, team) {
       assignee = assigneeEmails[j];
       assigneeRow = j + 2;
 
-      if (!visitedRanges[assigneeRow + ",1"]) {
-        visitedRanges[assigneeRow + ",1"] = 1;
-        sheet.getRange(assigneeRow, 1, 1, 1).setValue(team[assignee].name);
-        ASSIGNEE_ROW_MAP[team[assignee].name] = assigneeRow;
+      if (!visitedRanges[startRow + assigneeRow + ",1"]) {
+        totalRow = startRow + assigneeRow;
+        visitedRanges[totalRow + ",1"] = 1;
+        sheet.getRange(totalRow, 1, 1, 1).setValue(team[assignee].name);
+        ASSIGNEE_ROW_MAP[team[assignee].name] = totalRow;
         var totalColumn = sprintCount + 4;
-        sheet.getRange(1, totalColumn - 1, 1, 1).setValue(COLUMN_LABELS.totalMinus);
-        sheet.getRange(1, totalColumn, 1, 1).setValue(COLUMN_LABELS.total);
-        sheet.getRange(1, totalColumn + 1, 1, 1).setValue(COLUMN_LABELS.totalPlus);
-        var A1RangeAssigneeTotal = "B" + assigneeRow + ":" + ALPHA[sprintCount] + assigneeRow;
-        sheet.getRange(assigneeRow, totalColumn - 1, 1, 1).setValue("=" +
-          ALPHA[totalColumn - 1] + assigneeRow + "-STDEV(" + A1RangeAssigneeTotal + ")");
-        sheet.getRange(assigneeRow, totalColumn, 1, 1).setValue("=SUM(" + A1RangeAssigneeTotal + ")");
-        sheet.getRange(assigneeRow, totalColumn + 1, 1, 1).setValue("=" +
-          ALPHA[totalColumn - 1] + assigneeRow + "+STDEV(" + A1RangeAssigneeTotal + ")");
+        sheet.getRange(startRow + 1, totalColumn - 1, 1, 1).setValue(COLUMN_LABELS.totalMinus);
+        sheet.getRange(startRow + 1, totalColumn, 1, 1).setValue(COLUMN_LABELS.total);
+        sheet.getRange(startRow + 1, totalColumn + 1, 1, 1).setValue(COLUMN_LABELS.totalPlus);
+        var A1RangeAssigneeTotal = "B" + totalRow + ":" + ALPHA[sprintCount] + totalRow;
+        sheet.getRange(totalRow, totalColumn - 1, 1, 1).setValue("=" +
+          ALPHA[totalColumn - 1] + (totalRow) + "-STDEV(" + A1RangeAssigneeTotal + ")");
+        sheet.getRange(totalRow, totalColumn, 1, 1).setValue("=SUM(" + A1RangeAssigneeTotal + ")");
+        sheet.getRange(totalRow, totalColumn + 1, 1, 1).setValue("=" +
+          ALPHA[totalColumn - 1] + (totalRow) + "+STDEV(" + A1RangeAssigneeTotal + ")");
 
         // Also set the labels for the table with relative velocity (assignee totals).
-        sheet.getRange(tableOffset + assigneeRow, 1, 1, 1).setValue(team[assignee].name);
-        sheet.getRange(tableOffset + assigneeRow, totalColumn - 1, 1, 1).setValue(COLUMN_LABELS.totalMinus);
-        sheet.getRange(tableOffset + assigneeRow, totalColumn, 1, 1).setValue(COLUMN_LABELS.total);
-        sheet.getRange(tableOffset + assigneeRow, totalColumn + 1, 1, 1).setValue(COLUMN_LABELS.totalPlus);
-        A1RangeAssigneeTotal = "B" + (tableOffset + assigneeRow) + ":" +
-          ALPHA[sprintCount] + (tableOffset + assigneeRow);
-        sheet.getRange(tableOffset + assigneeRow, totalColumn - 1, 1, 1).setValue("=" +
-          ALPHA[totalColumn - 1] + (tableOffset + assigneeRow) + "-STDEV(" + A1RangeAssigneeTotal + ")");
-        sheet.getRange(tableOffset + assigneeRow, totalColumn, 1, 1).setValue("=SUM(" + A1RangeAssigneeTotal + ")");
-        sheet.getRange(tableOffset + assigneeRow, totalColumn + 1, 1, 1).setValue("=" +
-          ALPHA[totalColumn - 1] + (tableOffset + assigneeRow) + "+STDEV(" + A1RangeAssigneeTotal + ")");
+        totalRow = relativeVelocityTableOffset + assigneeRow;
+        sheet.getRange(totalRow, 1, 1, 1).setValue(team[assignee].name);
+        sheet.getRange(relativeVelocityTableOffset + 1, totalColumn - 1, 1, 1).setValue(COLUMN_LABELS.totalMinus);
+        sheet.getRange(relativeVelocityTableOffset + 1, totalColumn, 1, 1).setValue(COLUMN_LABELS.total);
+        sheet.getRange(relativeVelocityTableOffset + 1, totalColumn + 1, 1, 1).setValue(COLUMN_LABELS.totalPlus);
+        A1RangeAssigneeTotal = "B" + totalRow + ":" + ALPHA[sprintCount] + totalRow;
+        sheet.getRange(totalRow, totalColumn - 1, 1, 1).setValue("=" +
+          ALPHA[totalColumn - 1] + totalRow + "-STDEV(" + A1RangeAssigneeTotal + ")");
+        sheet.getRange(totalRow, totalColumn, 1, 1).setValue("=SUM(" + A1RangeAssigneeTotal + ")");
+        sheet.getRange(totalRow, totalColumn + 1, 1, 1).setValue("=" +
+          ALPHA[totalColumn - 1] + totalRow + "+STDEV(" + A1RangeAssigneeTotal + ")");
         sheet.hideColumns(totalColumn - 1);
         sheet.hideColumns(totalColumn + 1);
       }
@@ -226,25 +237,25 @@ function generateSheet(points, team) {
         }
         pointTotal += pointValue;
       }
-      sheet.getRange(assigneeRow, sprintColumn, 1, 1).setValue(pointTotal);
+      sheet.getRange(startRow + assigneeRow, sprintColumn, 1, 1).setValue(pointTotal);
 
-      // Also set the labels for the table with relative velocity.
-      sheet.getRange(tableOffset + assigneeRow, sprintColumn, 1, 1)
+      // Also set the values for the table with relative velocity.
+      sheet.getRange(relativeVelocityTableOffset + assigneeRow, sprintColumn, 1, 1)
         .setValue(pointTotal * (1 + (1 - getAvailability(team[assignee].name, sprintName, team))));
     }
   }
-  return sheet;
+  return drawIndividualsCharts(sheet, points, team, teamData, startRow);
 }
 
-function drawCharts(sheet, points, team) {
+function drawIndividualsCharts(sheet, points, team, teamData, tableStartRow) {
   var sprintCount = Object.keys(points).length;
   var assigneeEmailsCount = Object.keys(team).length;
-  var chartsOffset = 13;
+  var chartsOffset = 4;
   // First, chart out the developments per sprint.
-  var totalRow = (assigneeEmailsCount * 2) + 10;
+  var totalRow = tableStartRow + (assigneeEmailsCount * 2) + 10;
   var chart = sheet.newChart()
     .asAreaChart()
-    .addRange(sheet.getRange("A1:" + ALPHA[sprintCount] + "1"))
+    .addRange(sheet.getRange("B" + (tableStartRow + 1) + ":" + ALPHA[sprintCount] + (tableStartRow + 1)))
     .addRange(sheet.getRange("A" + totalRow + ":" + ALPHA[sprintCount] + totalRow))
     .addRange(sheet.getRange("A" + (totalRow - 1) + ":" + ALPHA[sprintCount] + (totalRow - 1)))
     .addRange(sheet.getRange("A" + (totalRow + 1) + ":" + ALPHA[sprintCount] + (totalRow + 1)))
@@ -254,30 +265,30 @@ function drawCharts(sheet, points, team) {
     .setTransposeRowsAndColumns(true)
     .setXAxisTitle(COLUMN_LABELS.sprints)
     .setYAxisTitle(COLUMN_LABELS.points)
-    .setPosition((assigneeEmailsCount * 2) + chartsOffset, 2, 0, 0)
+    .setPosition(tableStartRow - (assigneeEmailsCount * 2) - chartsOffset, 2, 0, 0)
     .build();
   sheet.insertChart(chart);
 
   // Next, chart out the developments per assignee.
   chart = sheet.newChart()
     .asPieChart()
-    .addRange(sheet.getRange("A2:A" + (assigneeEmailsCount + 1)))
-    .addRange(sheet.getRange(ALPHA[sprintCount + 2] + "2:" +
-      ALPHA[sprintCount + 2] + (assigneeEmailsCount + 1)))
-    .setPosition((assigneeEmailsCount * 2) + chartsOffset, 9, 0, 0)
+    .addRange(sheet.getRange("A" + (tableStartRow + 2) + ":A" + (tableStartRow + assigneeEmailsCount + 1)))
+    .addRange(sheet.getRange(ALPHA[sprintCount + 2] + (tableStartRow + 2)  + ":" +
+      ALPHA[sprintCount + 2] + (tableStartRow + assigneeEmailsCount + 1)))
+    .setPosition(tableStartRow - (assigneeEmailsCount * 2) - chartsOffset, 9, 0, 0)
     .build();
   sheet.insertChart(chart);
+
+  return sheet;
 }
 
-function addTeamsSection(sheet, points, team) {
-  var teamData = getTeamData();
+function addTeamsSection(sheet, points, team, teamData, startRow) {
   //Logger.log("TEAMS:: " + JSON.stringify(teamData, null, 2));
-
-  var mainTableSpan = (Object.keys(team).length * 2) + 12;
-  var chartsRowSpan = 19;
-  var tableRowOffset = mainTableSpan + chartsRowSpan;
-
+  // var mainTableSpan = (Object.keys(team).length * 2) + 12;
   var teamCount = teamData.names.length;
+  var chartsRowSpan = 19;
+  var tableRowOffset = startRow - chartsRowSpan - teamCount - 6;
+
   var sprintNames = Object.keys(points);
   var sprintCount = sprintNames.length;
   var visitedRanges = {};
@@ -331,13 +342,13 @@ function addTeamsSection(sheet, points, team) {
           visitedRanges[teamRow + ",1"] = 1;
 
           // Also add labels for the calculations table.
-          sheet.getRange(teamRow + teamCount + 6, 1, 1, 1).setValue(teamName);
-          sheet.getRange(tableRowOffset + teamCount + 7, totalColumn - 1, 1, 1).setValue(COLUMN_LABELS.totalMinus);
-          sheet.getRange(tableRowOffset + teamCount + 7, totalColumn, 1, 1).setValue(COLUMN_LABELS.total);
-          sheet.getRange(tableRowOffset + teamCount + 7, totalColumn + 1, 1, 1).setValue(COLUMN_LABELS.totalPlus);
-          sheet.getRange(tableRowOffset + teamCount + 7, totalColumn + 2, 1, 1).setValue(COLUMN_LABELS.averageMinus);
-          sheet.getRange(tableRowOffset + teamCount + 7, totalColumn + 3, 1, 1).setValue(COLUMN_LABELS.average);
-          sheet.getRange(tableRowOffset + teamCount + 7, totalColumn + 4, 1, 1).setValue(COLUMN_LABELS.averagePlus);
+          sheet.getRange(teamRow - teamCount - 2, 1, 1, 1).setValue(teamName);
+          sheet.getRange(tableRowOffset - teamCount - 1, totalColumn - 1, 1, 1).setValue(COLUMN_LABELS.totalMinus);
+          sheet.getRange(tableRowOffset - teamCount - 1, totalColumn, 1, 1).setValue(COLUMN_LABELS.total);
+          sheet.getRange(tableRowOffset - teamCount - 1, totalColumn + 1, 1, 1).setValue(COLUMN_LABELS.totalPlus);
+          sheet.getRange(tableRowOffset - teamCount - 1, totalColumn + 2, 1, 1).setValue(COLUMN_LABELS.averageMinus);
+          sheet.getRange(tableRowOffset - teamCount - 1, totalColumn + 3, 1, 1).setValue(COLUMN_LABELS.average);
+          sheet.getRange(tableRowOffset - teamCount - 1, totalColumn + 4, 1, 1).setValue(COLUMN_LABELS.averagePlus);
           sheet.hideColumns(totalColumn + 2);
           sheet.hideColumns(totalColumn + 4);
         }
@@ -365,7 +376,7 @@ function addTeamsSection(sheet, points, team) {
 
   // Add totals to the calculations table.
   for (var pointsCount, p = 0; p < teamCount; ++p) {
-    teamRow = tableRowOffset + teamCount + p + 8;
+    teamRow = (tableRowOffset - teamCount) + p;
     teamName = teamData.names[p];
     teamPoints = pruneOutliers(teamCalcColumns[teamName]);
     pointsCount = teamPoints.length;
@@ -382,44 +393,46 @@ function addTeamsSection(sheet, points, team) {
       sheet.getRange(teamRow, totalColumn + 1).setValue("=" +
         ALPHA[totalColumn - 1] + teamRow + "+STDEV(B" + A1RangeTeamTotal + ")");
       // Averages;
-      sheet.getRange(teamRow, totalColumn + 2).setValue("=" +
-        ALPHA[totalColumn + 2] + teamRow + "-STDEV(B" + A1RangeTeamTotal + ")");
-      sheet.getRange(teamRow, totalColumn + 4).setValue("=" +
-        ALPHA[totalColumn + 2] + teamRow + "+STDEV(B" + A1RangeTeamTotal + ")");
+      sheet.getRange(teamRow, totalColumn + 2).setValue("=STDEV(B" + A1RangeTeamTotal + ")");
+      sheet.getRange(teamRow, totalColumn + 4).setValue("=STDEV(B" + A1RangeTeamTotal + ")");
     } else {
       // Totals;
       sheet.getRange(teamRow, totalColumn - 1).setValue("=SUM(B" + A1RangeTeamTotal + ")");
       sheet.getRange(teamRow, totalColumn + 1).setValue("=SUM(B" + A1RangeTeamTotal + ")");
       // Averages;
-      sheet.getRange(teamRow, totalColumn + 2).setValue("=AVERAGE(B" + A1RangeTeamTotal + ")");
-      sheet.getRange(teamRow, totalColumn + 4).setValue("=AVERAGE(B" + A1RangeTeamTotal + ")");
+      sheet.getRange(teamRow, totalColumn + 2).setValue(0);
+      sheet.getRange(teamRow, totalColumn + 4).setValue(0);
     }
   }
 
-  addTeamCharts(sheet, points, team, teamData);
+  return addTeamCharts(sheet, points, team, teamData, startRow);
 }
 
-function addTeamCharts(sheet, points, team, teamData) {
+function addTeamCharts(sheet, points, team, teamData, indvidualsTableStartRow) {
   var sprintCount = Object.keys(points).length;
   var assigneeEmailsCount = Object.keys(team).length;
   var teamCount = teamData.names.length;
   var chartsOffset = 19;
 
-  var startRow = (assigneeEmailsCount * 2) + (teamCount * 2) + chartsOffset + 10;
-  var endRow = startRow + teamCount;
-  var averageColumn = sprintCount + 7;
+  var startRow = indvidualsTableStartRow - (teamCount * 2) - chartsOffset - 6;
+  var endRow = startRow + teamCount - 1;
+  var averageColumn = sprintCount + 6;
   var chart = sheet.newChart()
-    .asAreaChart()
+    // .asAreaChart()
+    .asColumnChart()
+    .setStacked()
     .addRange(sheet.getRange("A" + startRow + ":A" + endRow))
-    .addRange(sheet.getRange(ALPHA[averageColumn - 1] + startRow + ":" + ALPHA[averageColumn - 1] + endRow))
-    .addRange(sheet.getRange(ALPHA[averageColumn - 2] + startRow + ":" + ALPHA[averageColumn - 2] + endRow))
-    .addRange(sheet.getRange(ALPHA[averageColumn] + startRow + ":" + ALPHA[averageColumn] + endRow))
+    .addRange(sheet.getRange(ALPHA[averageColumn - 1] + (startRow - 1) + ":" + ALPHA[averageColumn - 1] + endRow))
+    .addRange(sheet.getRange(ALPHA[averageColumn] + (startRow - 1) + ":" + ALPHA[averageColumn] + endRow))
+    .addRange(sheet.getRange(ALPHA[averageColumn + 1] + (startRow - 1) + ":" + ALPHA[averageColumn + 1] + endRow))
     .setNumHeaders(1)
     .setMergeStrategy(Charts.ChartMergeStrategy.MERGE_COLUMNS)
     .setHiddenDimensionStrategy(Charts.ChartHiddenDimensionStrategy.SHOW_BOTH)
     .setXAxisTitle(COLUMN_LABELS.teams)
     .setYAxisTitle(COLUMN_LABELS.points)
-    .setPosition(endRow + 2, 2, 0, 0)
+    .setPosition(startRow - chartsOffset, 2, 0, 0)
     .build();
   sheet.insertChart(chart);
+
+  return sheet;
 }
