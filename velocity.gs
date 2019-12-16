@@ -166,12 +166,12 @@ function addIndividualsSection(sheet, points, team, teamData, startRow) {
       sheet.getRange(totalRow - 1, 1, 1, 1).setValue(COLUMN_LABELS.totalMinus);
       sheet.getRange(totalRow, 1, 1, 1).setValue(COLUMN_LABELS.total);
       sheet.getRange(totalRow + 1, 1, 1, 1).setValue(COLUMN_LABELS.totalPlus);
-      var A1RangeSprintTotal = ALPHA[i + 1] + (startRow + 2) + ":" + ALPHA[i + 1] + (startRow + assigneeCount + 1);
+      var A1RangeSprintTotal = getR1C1(i + 2, startRow + 2, i + 2, startRow + assigneeCount + 1);
       sheet.getRange(totalRow - 1, sprintColumn, 1, 1).setValue("=" +
-        ALPHA[sprintColumn - 1] + totalRow + "-STDEV(" + A1RangeSprintTotal + ")");
+        getR1C1(sprintColumn, totalRow) + "-STDEV(" + A1RangeSprintTotal + ")");
       sheet.getRange(totalRow, sprintColumn, 1, 1).setValue("=SUM(" + A1RangeSprintTotal + ")");
       sheet.getRange(totalRow + 1, sprintColumn, 1, 1).setValue("=" +
-        ALPHA[sprintColumn - 1] + totalRow + "+STDEV(" + A1RangeSprintTotal + ")");
+        getR1C1(sprintColumn, totalRow) + "+STDEV(" + A1RangeSprintTotal + ")");
       sheet.hideRows(totalRow - 1);
       sheet.hideRows(totalRow + 1);
 
@@ -181,13 +181,13 @@ function addIndividualsSection(sheet, points, team, teamData, startRow) {
       sheet.getRange(totalRow - 1, 1, 1, 1).setValue(COLUMN_LABELS.totalMinus);
       sheet.getRange(totalRow, 1, 1, 1).setValue(COLUMN_LABELS.total);
       sheet.getRange(totalRow + 1, 1, 1, 1).setValue(COLUMN_LABELS.totalPlus);
-      A1RangeSprintTotal = ALPHA[i + 1] + (relativeVelocityTableOffset + 2) + ":" + ALPHA[i + 1] +
-        (relativeVelocityTableOffset + assigneeCount + 1);
+      A1RangeSprintTotal = getR1C1(i + 2, relativeVelocityTableOffset + 2, i + 2,
+        relativeVelocityTableOffset + assigneeCount + 1);
       sheet.getRange(totalRow - 1, sprintColumn, 1, 1).setValue("=" +
-        ALPHA[sprintColumn - 1] + totalRow + "-STDEV(" + A1RangeSprintTotal + ")");
+        getR1C1(sprintColumn, totalRow) + "-STDEV(" + A1RangeSprintTotal + ")");
       sheet.getRange(totalRow, sprintColumn, 1, 1).setValue("=SUM(" + A1RangeSprintTotal + ")");
       sheet.getRange(totalRow + 1, sprintColumn, 1, 1).setValue("=" +
-        ALPHA[sprintColumn - 1] + totalRow + "+STDEV(" + A1RangeSprintTotal + ")");
+        getR1C1(sprintColumn, totalRow) + "+STDEV(" + A1RangeSprintTotal + ")");
       sheet.hideRows(totalRow - 1);
       sheet.hideRows(totalRow + 1);
     }
@@ -205,12 +205,12 @@ function addIndividualsSection(sheet, points, team, teamData, startRow) {
         sheet.getRange(startRow + 1, totalColumn - 1, 1, 1).setValue(COLUMN_LABELS.totalMinus);
         sheet.getRange(startRow + 1, totalColumn, 1, 1).setValue(COLUMN_LABELS.total);
         sheet.getRange(startRow + 1, totalColumn + 1, 1, 1).setValue(COLUMN_LABELS.totalPlus);
-        var A1RangeAssigneeTotal = "B" + totalRow + ":" + ALPHA[sprintCount] + totalRow;
+        var A1RangeAssigneeTotal = getR1C1(2, totalRow, sprintCount + 1, totalRow);
         sheet.getRange(totalRow, totalColumn - 1, 1, 1).setValue("=" +
-          ALPHA[totalColumn - 1] + (totalRow) + "-STDEV(" + A1RangeAssigneeTotal + ")");
+          getR1C1(totalColumn, totalRow) + "-STDEV(" + A1RangeAssigneeTotal + ")");
         sheet.getRange(totalRow, totalColumn, 1, 1).setValue("=SUM(" + A1RangeAssigneeTotal + ")");
         sheet.getRange(totalRow, totalColumn + 1, 1, 1).setValue("=" +
-          ALPHA[totalColumn - 1] + (totalRow) + "+STDEV(" + A1RangeAssigneeTotal + ")");
+          getR1C1(totalColumn, totalRow) + "+STDEV(" + A1RangeAssigneeTotal + ")");
 
         // Also set the labels for the table with relative velocity (assignee totals).
         totalRow = relativeVelocityTableOffset + assigneeRow;
@@ -218,12 +218,12 @@ function addIndividualsSection(sheet, points, team, teamData, startRow) {
         sheet.getRange(relativeVelocityTableOffset + 1, totalColumn - 1, 1, 1).setValue(COLUMN_LABELS.totalMinus);
         sheet.getRange(relativeVelocityTableOffset + 1, totalColumn, 1, 1).setValue(COLUMN_LABELS.total);
         sheet.getRange(relativeVelocityTableOffset + 1, totalColumn + 1, 1, 1).setValue(COLUMN_LABELS.totalPlus);
-        A1RangeAssigneeTotal = "B" + totalRow + ":" + ALPHA[sprintCount] + totalRow;
+        A1RangeAssigneeTotal = getR1C1(2, totalRow, sprintCount + 1, totalRow);
         sheet.getRange(totalRow, totalColumn - 1, 1, 1).setValue("=" +
-          ALPHA[totalColumn - 1] + totalRow + "-STDEV(" + A1RangeAssigneeTotal + ")");
+          getR1C1(totalColumn, totalRow) + "-STDEV(" + A1RangeAssigneeTotal + ")");
         sheet.getRange(totalRow, totalColumn, 1, 1).setValue("=SUM(" + A1RangeAssigneeTotal + ")");
         sheet.getRange(totalRow, totalColumn + 1, 1, 1).setValue("=" +
-          ALPHA[totalColumn - 1] + totalRow + "+STDEV(" + A1RangeAssigneeTotal + ")");
+          getR1C1(totalColumn, totalRow) + "+STDEV(" + A1RangeAssigneeTotal + ")");
         sheet.hideColumns(totalColumn - 1);
         sheet.hideColumns(totalColumn + 1);
       }
@@ -255,10 +255,10 @@ function drawIndividualsCharts(sheet, points, team, teamData, tableStartRow) {
   var totalRow = tableStartRow + (assigneeEmailsCount * 2) + 10;
   var chart = sheet.newChart()
     .asAreaChart()
-    .addRange(sheet.getRange("B" + (tableStartRow + 1) + ":" + ALPHA[sprintCount] + (tableStartRow + 1)))
-    .addRange(sheet.getRange("A" + totalRow + ":" + ALPHA[sprintCount] + totalRow))
-    .addRange(sheet.getRange("A" + (totalRow - 1) + ":" + ALPHA[sprintCount] + (totalRow - 1)))
-    .addRange(sheet.getRange("A" + (totalRow + 1) + ":" + ALPHA[sprintCount] + (totalRow + 1)))
+    .addRange(sheet.getRange(getR1C1(2, tableStartRow + 1, sprintCount + 1, tableStartRow + 1)))
+    .addRange(sheet.getRange(getR1C1(1, totalRow, sprintCount + 1, totalRow)))
+    .addRange(sheet.getRange(getR1C1(1, totalRow, sprintCount + 1, totalRow - 1)))
+    .addRange(sheet.getRange(getR1C1(1, totalRow + 1, sprintCount + 1, totalRow + 1)))
     .setNumHeaders(1)
     .setMergeStrategy(Charts.ChartMergeStrategy.MERGE_ROWS)
     .setHiddenDimensionStrategy(Charts.ChartHiddenDimensionStrategy.SHOW_BOTH)
@@ -272,9 +272,9 @@ function drawIndividualsCharts(sheet, points, team, teamData, tableStartRow) {
   // Next, chart out the developments per assignee.
   chart = sheet.newChart()
     .asPieChart()
-    .addRange(sheet.getRange("A" + (tableStartRow + 2) + ":A" + (tableStartRow + assigneeEmailsCount + 1)))
-    .addRange(sheet.getRange(ALPHA[sprintCount + 2] + (tableStartRow + 2)  + ":" +
-      ALPHA[sprintCount + 2] + (tableStartRow + assigneeEmailsCount + 1)))
+    .addRange(sheet.getRange(getR1C1(1, tableStartRow + 2, 1, tableStartRow + assigneeEmailsCount + 1)))
+    .addRange(sheet.getRange(getR1C1(sprintCount + 1, tableStartRow + 2,
+      sprintCount + 1, tableStartRow + assigneeEmailsCount + 1)))
     .setPosition(tableStartRow - (assigneeEmailsCount * 2) - chartsOffset, 9, 0, 0)
     .build();
   sheet.insertChart(chart);
@@ -283,8 +283,6 @@ function drawIndividualsCharts(sheet, points, team, teamData, tableStartRow) {
 }
 
 function addTeamsSection(sheet, points, team, teamData, startRow) {
-  //Logger.log("TEAMS:: " + JSON.stringify(teamData, null, 2));
-  // var mainTableSpan = (Object.keys(team).length * 2) + 12;
   var teamCount = teamData.names.length;
   var chartsRowSpan = 19;
   var tableRowOffset = startRow - chartsRowSpan - teamCount - 6;
@@ -304,13 +302,13 @@ function addTeamsSection(sheet, points, team, teamData, startRow) {
       sheet.getRange(totalRow - 1, 1, 1, 1).setValue(COLUMN_LABELS.totalMinus);
       sheet.getRange(totalRow, 1, 1, 1).setValue(COLUMN_LABELS.total);
       sheet.getRange(totalRow + 1, 1, 1, 1).setValue(COLUMN_LABELS.totalPlus);
-      var A1RangeSprintTotal = ALPHA[i + 1] + (tableRowOffset + 2) + ":" +
-        ALPHA[i + 1] + (tableRowOffset + teamCount + 1);
+      var A1RangeSprintTotal = getR1C1(i + 2, tableRowOffset + 2, i + 2,
+        tableRowOffset + teamCount + 1);
       sheet.getRange(totalRow - 1, sprintColumn, 1, 1).setValue("=" +
-        ALPHA[sprintColumn - 1] + totalRow + "-STDEV(" + A1RangeSprintTotal + ")");
+        getR1C1(sprintColumn, totalRow) + "-STDEV(" + A1RangeSprintTotal + ")");
       sheet.getRange(totalRow, sprintColumn, 1, 1).setValue("=SUM(" + A1RangeSprintTotal + ")");
       sheet.getRange(totalRow + 1, sprintColumn, 1, 1).setValue("=" +
-        ALPHA[sprintColumn - 1] + totalRow + "+STDEV(" + A1RangeSprintTotal + ")");
+        getR1C1(sprintColumn, totalRow) + "+STDEV(" + A1RangeSprintTotal + ")");
       sheet.hideRows(totalRow - 1);
       sheet.hideRows(totalRow + 1);
       visitedRanges[range] = 1;
@@ -331,12 +329,12 @@ function addTeamsSection(sheet, points, team, teamData, startRow) {
           sheet.getRange(tableRowOffset + 1, totalColumn - 1, 1, 1).setValue(COLUMN_LABELS.totalMinus);
           sheet.getRange(tableRowOffset + 1, totalColumn, 1, 1).setValue(COLUMN_LABELS.total);
           sheet.getRange(tableRowOffset + 1, totalColumn + 1, 1, 1).setValue(COLUMN_LABELS.totalPlus);
-          var A1RangeTeamTotal = "B" + teamRow + ":" + ALPHA[sprintCount] + teamRow;
+          var A1RangeTeamTotal = getR1C1(2, teamRow, sprintCount + 1, teamRow);
           sheet.getRange(teamRow, totalColumn - 1, 1, 1).setValue("=" +
-            ALPHA[totalColumn - 1] + teamRow + "-STDEV(" + A1RangeTeamTotal + ")");
+            getR1C1(totalColumn, teamRow) + "-STDEV(" + A1RangeTeamTotal + ")");
           sheet.getRange(teamRow, totalColumn, 1, 1).setValue("=SUM(" + A1RangeTeamTotal + ")");
           sheet.getRange(teamRow, totalColumn + 1, 1, 1).setValue("=" +
-            ALPHA[totalColumn - 1] + teamRow + "+STDEV(" + A1RangeTeamTotal + ")");
+            getR1C1(totalColumn, teamRow) + "+STDEV(" + A1RangeTeamTotal + ")");
           sheet.hideColumns(totalColumn - 1);
           sheet.hideColumns(totalColumn + 1);
           visitedRanges[teamRow + ",1"] = 1;
@@ -359,6 +357,9 @@ function addTeamsSection(sheet, points, team, teamData, startRow) {
           assignee = assignees[k];
           assigneeAvailability = 1 + (1 - getAvailability(assignee, sprintName, team));
           commitment = teamCommitments[assignee] / 100;
+          if (!assignee) {
+
+          }
           assigneePoints = parseInt(sheet.getRange(ASSIGNEE_ROW_MAP[assignee],
             SPRINT_COLUMN_MAP[sprintName], 1, 1).getValue(), 10);
           // Logger.log("Adding points to team " + teamName + " for sprint " +
@@ -383,22 +384,22 @@ function addTeamsSection(sheet, points, team, teamData, startRow) {
     for (var q = 0; q < pointsCount; ++q) {
       sheet.getRange(teamRow, q + 2, 1, 1).setValue(teamPoints[q]);
     }
-    A1RangeTeamTotal = teamRow + ":" + ALPHA[pointsCount - 1] + teamRow;
-    sheet.getRange(teamRow, totalColumn).setValue("=SUM(B" + A1RangeTeamTotal + ")");
-    sheet.getRange(teamRow, totalColumn + 3).setValue("=AVERAGE(B" + A1RangeTeamTotal + ")");
+    A1RangeTeamTotal = getR1C1(2, teamRow, pointsCount, teamRow);
+    sheet.getRange(teamRow, totalColumn).setValue("=SUM(" + A1RangeTeamTotal + ")");
+    sheet.getRange(teamRow, totalColumn + 3).setValue("=AVERAGE(" + A1RangeTeamTotal + ")");
     if (pointsCount > 2) {
       // Totals;
       sheet.getRange(teamRow, totalColumn - 1).setValue("=" +
-        ALPHA[totalColumn - 1] + teamRow + "-STDEV(B" + A1RangeTeamTotal + ")");
+        getR1C1(totalColumn, teamRow) + "-STDEV(" + A1RangeTeamTotal + ")");
       sheet.getRange(teamRow, totalColumn + 1).setValue("=" +
-        ALPHA[totalColumn - 1] + teamRow + "+STDEV(B" + A1RangeTeamTotal + ")");
+        getR1C1(totalColumn, teamRow) + "+STDEV(" + A1RangeTeamTotal + ")");
       // Averages;
-      sheet.getRange(teamRow, totalColumn + 2).setValue("=STDEV(B" + A1RangeTeamTotal + ")");
-      sheet.getRange(teamRow, totalColumn + 4).setValue("=STDEV(B" + A1RangeTeamTotal + ")");
+      sheet.getRange(teamRow, totalColumn + 2).setValue("=STDEV(" + A1RangeTeamTotal + ")");
+      sheet.getRange(teamRow, totalColumn + 4).setValue("=STDEV(" + A1RangeTeamTotal + ")");
     } else {
       // Totals;
-      sheet.getRange(teamRow, totalColumn - 1).setValue("=SUM(B" + A1RangeTeamTotal + ")");
-      sheet.getRange(teamRow, totalColumn + 1).setValue("=SUM(B" + A1RangeTeamTotal + ")");
+      sheet.getRange(teamRow, totalColumn - 1).setValue("=SUM(" + A1RangeTeamTotal + ")");
+      sheet.getRange(teamRow, totalColumn + 1).setValue("=SUM(" + A1RangeTeamTotal + ")");
       // Averages;
       sheet.getRange(teamRow, totalColumn + 2).setValue(0);
       sheet.getRange(teamRow, totalColumn + 4).setValue(0);
@@ -421,10 +422,10 @@ function addTeamCharts(sheet, points, team, teamData, indvidualsTableStartRow) {
     // .asAreaChart()
     .asColumnChart()
     .setStacked()
-    .addRange(sheet.getRange("A" + startRow + ":A" + endRow))
-    .addRange(sheet.getRange(ALPHA[averageColumn - 1] + (startRow - 1) + ":" + ALPHA[averageColumn - 1] + endRow))
-    .addRange(sheet.getRange(ALPHA[averageColumn] + (startRow - 1) + ":" + ALPHA[averageColumn] + endRow))
-    .addRange(sheet.getRange(ALPHA[averageColumn + 1] + (startRow - 1) + ":" + ALPHA[averageColumn + 1] + endRow))
+    .addRange(sheet.getRange(getR1C1(1, startRow, 1, endRow)))
+    .addRange(sheet.getRange(getR1C1(averageColumn, (startRow - 1), averageColumn, endRow)))
+    .addRange(sheet.getRange(getR1C1(averageColumn + 1, (startRow - 1), averageColumn + 1, endRow)))
+    .addRange(sheet.getRange(getR1C1(averageColumn + 2, (startRow - 1), averageColumn + 2, endRow)))
     .setNumHeaders(1)
     .setMergeStrategy(Charts.ChartMergeStrategy.MERGE_COLUMNS)
     .setHiddenDimensionStrategy(Charts.ChartHiddenDimensionStrategy.SHOW_BOTH)

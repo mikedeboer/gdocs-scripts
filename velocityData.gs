@@ -144,8 +144,8 @@ function correctCommitments(teams) {
   return teams;
 }
 
-function parseTeamsLine(line, allTeamNames) {
-  var teams = { active: [], commitments: [] };
+function parseTeamsLine(line, sprintIndex, allTeamNames) {
+  var teams = { active: [], commitments: [], pointsCommitted: {} };
   var teamParts = line.split(/\]\s*,\s*\[/);
   for (var team, members, i = 0, l = teamParts.length; i < l; ++i) {
     members = teamParts[i].trim().replace(/^\[|\]$/g, "").split(",");
@@ -159,6 +159,7 @@ function parseTeamsLine(line, allTeamNames) {
     if (team) {
       var teamName = Object.keys(team).sort().join(", ");
       teams.active.push(teamName);
+      teams.pointsCommitted[teamName] = addSprintPointsCommitted(teamName, sprintIndex);
       if (allTeamNames.indexOf(teamName) == -1) {
         allTeamNames.push(teamName);
       }
@@ -176,8 +177,13 @@ function getTeamData() {
   var sprints = getSprints();
   var sprintData = {};
   var allTeamNames = [];
-  for (var i = 0, l = sprints.length; i < l; ++i) {
-    sprintData[sprints[i]] = parseTeamsLine(sheet.getRange(dataRow, i + 2).getValue().trim(), allTeamNames);
+  for (var line, i = 0, l = sprints.length; i < l; ++i) {
+    line = sheet.getRange(dataRow, i + 2).getValue().trim();
+    if (!line) {
+      continue;
+    }
+    sprintData[sprints[i]] = parseTeamsLine(line, i, allTeamNames);
+    addSprintPointsCommitted(sprintData[sprints[i]], i);
   }
 
   return {
@@ -213,4 +219,21 @@ function getTeamCommitments(teams, assignees) {
     fakeCommitments[assignees[k]] = 100000;
   }
   return fakeCommitments;
+}
+
+function addSprintPointsCommitted(teamName, sprintIndex) {
+  var sheet = getStaticDataSheet();
+  var startRange = sheet.createTextFinder("Sprint points committed").findNext();
+  var range = sheet.createTextFinder(teamName).startFrom(startRange).findNext();
+  if (!range) {
+    return 0;
+  }
+
+  var teamRow = range.getRow();
+  range = sheet.getRange(teamRow, sprintIndex + 2);
+  if (!range) {
+    return 0;
+  }
+
+  return range.getValue() || 0;
 }

@@ -42,3 +42,18 @@ function sanitizeBugzillaHTML(html) {
     .replace(/<script[^>]*>[\s\S]*?<\/script>/gim, "") // Get rid of script tags.
     .replace(/<br[^\/>]*>/gim, "<br/>");
 }
+
+var ALPHA = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+var ALPHA_LEN = ALPHA.length;
+
+function getR1C1(c1, r1, c2, r2) {
+  --c1;
+  var columnPrefix = ALPHA[Math.floor(c1 / ALPHA_LEN) - 1] || "";
+  var r1c1 = columnPrefix + ALPHA[(c1 % ALPHA_LEN)] + r1;
+  if (c2 && r2) {
+    --c2;
+    columnPrefix = ALPHA[Math.floor(c2 / ALPHA_LEN) - 1] || "";
+    r1c1 += ":" + columnPrefix + ALPHA[(c2 % ALPHA_LEN)] + r2;
+  }
+  return r1c1;
+}
