@@ -5,9 +5,25 @@ var AVAILABILITY_BOOSTS = {
 };
 var SPRINT_NAMES = [];
 var SPRINT_LENGTH = 10; // days.
+var CELL_VALUE_CACHE = [];
 
 function getStaticDataSheet() {
   return SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Static data");
+}
+
+function getStaticCellValue(sheet, row, column, emptyCellValue) {
+  if (typeof emptyCellValue == "undefined") {
+    emptyCellValue = "";
+  }
+  if (CELL_VALUE_CACHE[row] && typeof CELL_VALUE_CACHE[row][column] != "undefined") {
+    return CELL_VALUE_CACHE[row][column];
+  }
+
+  if (!CELL_VALUE_CACHE[row]) {
+    CELL_VALUE_CACHE[row] = [];
+  }
+  var range = sheet.getRange(row, column);
+  return (CELL_VALUE_CACHE[row][column] = range && range.getValue() || emptyCellValue);
 }
 
 function getTeam() {
@@ -15,17 +31,17 @@ function getTeam() {
   var endRow = sheet.createTextFinder("Team compositions").findNext().getRow() - 1;
   var team = {};
   for (var row = 4; row < endRow; ++row) {
-    team[sheet.getRange(row, 3).getValue().trim()] = {
-      name: sheet.getRange(row, 2).getValue().trim(),
-      country: sheet.getRange(row, 4).getValue().trim(),
-      workWeek: sheet.getRange(row, 5).getValue()
+    team[getStaticCellValue(sheet, row, 3).trim()] = {
+      name: getStaticCellValue(sheet, row, 2).trim(),
+      country: getStaticCellValue(sheet, row, 4).trim(),
+      workWeek: getStaticCellValue(sheet, row, 5)
     };
   }
   addAvailabilityData(team)
   return team;
 }
 
-function getSprints() {
+function getAllSprints() {
   if (SPRINT_NAMES.length) {
     return SPRINT_NAMES;
   }
@@ -37,7 +53,7 @@ function getSprints() {
   var endColumn, value;
   var currentColumn = startColumn;
   while (!endColumn) {
-    value = sheet.getRange(startRow, currentColumn).getValue().trim();
+    value = getStaticCellValue(sheet, startRow, currentColumn).trim();
     if (value) {
       ++currentColumn;
       continue;
@@ -45,20 +61,20 @@ function getSprints() {
     endColumn = currentColumn;
   }
   for (var column = startColumn; column < endColumn; ++column) {
-    SPRINT_NAMES.push(sheet.getRange(startRow, column).getValue().trim());
+    SPRINT_NAMES.push(getStaticCellValue(sheet, startRow, column).trim());
   }
   return SPRINT_NAMES;
 }
 
 function addAvailabilityData(team) {
   var sheet = getStaticDataSheet();
-  var startRow = sheet.createTextFinder("PTO Data").findNext().getRow() + 3;
-  var sprints = getSprints();
+  var startRow = sheet.createTextFinder("PTO Data").findNext().getRow() + 2;
+  var sprints = getAllSprints();
   var countryData = getAvailabilityPerCountry(team, sprints);
 
-  var assignees = Object.keys(team);
-  for (var member, factors, i = 0, l = assignees.length; i < l; ++i) {
-    member = team[assignees[i]];
+  var assigneeEmails = Object.keys(team);
+  for (var member, factors, i = 0, l = assigneeEmails.length; i < l; ++i) {
+    member = team[assigneeEmails[i]];
     member.availability = (member.workWeek / 40) * AVAILABILITY_BOOSTS.work_week;
 
     member.sprintsAvailability = {};
@@ -69,7 +85,7 @@ function addAvailabilityData(team) {
       if (holidays) {
         daysLeft -= holidays * AVAILABILITY_BOOSTS.holiday;
       }
-      daysLeft -= (sheet.getRange(startRow + i, j + 2).getValue() || 0) * AVAILABILITY_BOOSTS.pto;
+      daysLeft -= (getStaticCellValue(sheet, startRow + i, j + 2) || 0) * AVAILABILITY_BOOSTS.pto;
       member.sprintsAvailability[sprint] = Math.max(daysLeft, 0) / SPRINT_LENGTH;
     }
   }
@@ -80,41 +96,29 @@ function addAvailabilityData(team) {
 function getAvailabilityPerCountry(team, sprints) {
   var sheet = getStaticDataSheet();
   
-  var assignees = Object.keys(team);
+  var assigneeEmails = Object.keys(team);
   var countries = [];
-  for (var member, i = 0, l = assignees.length; i < l; ++i) {
-    country = team[assignees[i]].country;
+  for (var member, i = 0, l = assigneeEmails.length; i < l; ++i) {
+    country = team[assigneeEmails[i]].country;
     if (countries.indexOf(country) == -1) {
       countries.push(country);
     }
   }
 
-  var startRow = sheet.createTextFinder("PTO Data").findNext().getRow() + Object.keys(team).length + 5;
+  var startRow = sheet.createTextFinder("PTO Data").findNext().getRow() + Object.keys(team).length + 3;
   var endRow = startRow + countries.length;
   var countryData = {};
   for (var countryName, j = startRow; j < endRow; ++j) {
-    countryName = sheet.getRange(j, 1).getValue().trim();
+    countryName = getStaticCellValue(sheet, j, 1).trim();
     if (countries.indexOf(countryName) == -1) {
       continue;
     }
     countryData[countryName] = {};
     for (var k = 0, l2 = sprints.length; k < l2; ++k) {
-      countryData[countryName][sprints[k]] = (sheet.getRange(j, k + 2).getValue() || 0);
+      countryData[countryName][sprints[k]] = (getStaticCellValue(sheet, j, k + 2) || 0);
     }
   }
   return countryData;
-}
-
-function getAvailability(name, sprint, team) {
-  var assignees = Object.keys(team);
-  for (var assignee, i = 0, l = assignees.length; i < l; ++i) {
-    assignee = assignees[i];
-    if (team[assignee].name != name) {
-      continue;
-    }
-    return team[assignee].sprintsAvailability[sprint] || 1;
-  }
-  return 1;
 }
 
 function correctCommitments(teams) {
@@ -174,11 +178,11 @@ function getTeamData() {
   var sheet = getStaticDataSheet();
   var dataRow = sheet.createTextFinder("PTO data").findNext().getRow() - 2;
 
-  var sprints = getSprints();
+  var sprints = getAllSprints();
   var sprintData = {};
   var allTeamNames = [];
   for (var line, i = 0, l = sprints.length; i < l; ++i) {
-    line = sheet.getRange(dataRow, i + 2).getValue().trim();
+    line = getStaticCellValue(sheet, dataRow, i + 2).trim();
     if (!line) {
       continue;
     }
@@ -194,29 +198,29 @@ function getTeamData() {
   };
 }
 
-function getTeamCommitments(teams, assignees) {
+function getTeamCommitments(teams, assigneeNames) {
   for (var team, present, i = 0, l = teams.length; i < l; ++i) {
     team = teams[i];
-    if (Object.keys(team).length != assignees.length) {
+    if (Object.keys(team).length != assigneeNames.length) {
       continue;
     }
 
     present = [];
-    for (var j = 0, l2 = assignees.length; j < l2; ++j) {
-      if (!team[assignees[j]]) {
+    for (var j = 0, l2 = assigneeNames.length; j < l2; ++j) {
+      if (!team[assigneeNames[j]]) {
         break;
       }
-      present.push(assignees[j]);
+      present.push(assigneeNames[j]);
     }
-    if (present.length == assignees.length) {
+    if (present.length == assigneeNames.length) {
       return team;
     }
   }
 
   // Return something ridiculous so that the table displays weird results.
   var fakeCommitments = {};
-  for (var k = 0, l3 = assignees.length; k < l3; ++k) {
-    fakeCommitments[assignees[k]] = 100000;
+  for (var k = 0, l3 = assigneeNames.length; k < l3; ++k) {
+    fakeCommitments[assigneeNames[k]] = 100000;
   }
   return fakeCommitments;
 }
@@ -230,10 +234,5 @@ function addSprintPointsCommitted(teamName, sprintIndex) {
   }
 
   var teamRow = range.getRow();
-  range = sheet.getRange(teamRow, sprintIndex + 2);
-  if (!range) {
-    return 0;
-  }
-
-  return range.getValue() || 0;
+  return getStaticCellValue(sheet, teamRow, sprintIndex + 2, 0);
 }

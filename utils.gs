@@ -57,3 +57,25 @@ function getR1C1(c1, r1, c2, r2) {
   }
   return r1c1;
 }
+
+function getAssigneeEmail(assigneeName, team) {
+  var memberEmails = Object.keys(team);
+  for (var i = 0, l = memberEmails.length; i < l; ++i) {
+    if (team[memberEmails[i]].name == assigneeName) {
+      return memberEmails[i];
+    }
+  }
+  return null;
+}
+
+function getAvailability(name, sprint, team) {
+  var memberEmails = Object.keys(team);
+  for (var memberEmail, i = 0, l = memberEmails.length; i < l; ++i) {
+    memberEmail = memberEmails[i];
+    if (team[memberEmail].name != name) {
+      continue;
+    }
+    return team[memberEmail].sprintsAvailability[sprint] || 1;
+  }
+  return 1;
+}
