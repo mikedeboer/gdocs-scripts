@@ -176,7 +176,7 @@ function parseTeamsLine(line, sprintIndex, allTeamNames) {
 
 function getTeamData() {
   var sheet = getStaticDataSheet();
-  var dataRow = sheet.createTextFinder("PTO data").findNext().getRow() - 2;
+  var dataRow = sheet.createTextFinder("Team compositions").findNext().getRow() + 3;
 
   var sprints = getAllSprints();
   var sprintData = {};
@@ -187,7 +187,7 @@ function getTeamData() {
       continue;
     }
     sprintData[sprints[i]] = parseTeamsLine(line, i, allTeamNames);
-    addSprintPointsCommitted(sprintData[sprints[i]], i);
+    // addSprintPointsCommitted(sprintData[sprints[i]], i);
   }
 
   return {
@@ -196,6 +196,14 @@ function getTeamData() {
       return (b.match(/,/g) || []).length - (a.match(/,/g) || []).length;
     })
   };
+}
+
+function getForecastTeams() {
+  var sheet = getStaticDataSheet();
+  var dataRow = sheet.createTextFinder("Forecast teams").findNext().getRow();
+
+  var teams = parseTeamsLine(getStaticCellValue(sheet, dataRow, 2).trim(), 0, []);
+  return teams;
 }
 
 function getTeamCommitments(teams, assigneeNames) {

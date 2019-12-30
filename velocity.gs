@@ -1,9 +1,11 @@
 var ALPHA = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 var COLUMN_LABELS = {
+  absolute: "Absolute",
   average: "Average",
   averageMinus: "Average minus STDEV",
   averagePlus: "Average plus STDEV",
   points: "Points",
+  relative: "Relative",
   sprints: "Sprints",
   teams: "Teams",
   total: "Total",
@@ -188,8 +190,9 @@ function generateSheet(points, team, teamData) {
   sheet.hideColumns(totalColumn + 2);
   sheet.hideColumns(totalColumn + 4);
 
-  var rowSpan = addTeamsSection(sheet, points, team, teamData, startRow);
-  addIndividualsSection(sheet, points, team, teamData, startRow + rowSpan);
+  var rowSpan = addForecastsSection(sheet, points, team, teamData, startRow);
+  rowSpan += addTeamsSection(sheet, points, team, teamData, startRow + rowSpan);
+  rowSpan += addIndividualsSection(sheet, points, team, teamData, startRow + rowSpan);
 }
 
 function addIndividualsSection(sheet, points, team, teamData, startRow) {
@@ -388,9 +391,6 @@ function addTeamsSection(sheet, points, team, teamData, startRow) {
           }
 
           assigneePoints = pointsTotal.absolute;
-          // Logger.log("Adding points to team " + teamName + " for sprint " +
-          //   sprintName + " obo " + assigneeName + ": " + pointsTotal.absolute + "x" +
-          //   assigneeAvailability + "x" + commitment);
           teamPoints += ((pointsTotal.absolute * assigneeAvailability) * commitment);
         }
       }
@@ -463,4 +463,146 @@ function addTeamCharts(sheet, points, team, teamData, startRow) {
   sheet.insertChart(chart);
 
   return sheet;
+}
+
+function addForecastsSection(sheet, points, team, teamData, startRow) {
+  var forecastTeams = getForecastTeams();
+  var forecastTeamCount = forecastTeams.active.length;
+  var sprintNames = Object.keys(points);
+  var allSprints = getAllSprints();
+
+  var firstSprintIdx = allSprints.length - 1;
+  for (; firstSprintIdx >= 0; --firstSprintIdx) {
+    if (sprintNames.indexOf(allSprints[firstSprintIdx]) > -1) {
+      break;
+    }
+  }
+  var futureSprints = allSprints.slice(firstSprintIdx);
+  var futureSprintCount = futureSprints.length;
+
+  // First we need to get the average velocity numbers for independent assignees.
+  var sprintCount = sprintNames.length;
+  var assigneeTotals = {};
+  var sprintName, assigneeEmails, assigneeCount;
+  for (var i = 0; i < sprintCount; ++i) {
+    sprintName = sprintNames[i];
+    assigneeEmails = Object.keys(points[sprintName]);
+    assigneeCount = assigneeEmails.length;
+
+    var assigneeName, assigneeEmail, assigneeTotal;
+    for (var j = 0; j < assigneeCount; ++j) {
+      assigneeEmail = assigneeEmails[j];
+      assigneeName = team[assigneeEmail].name;
+      if (!assigneeTotals[assigneeName]) {
+        assigneeTotals[assigneeName] = {
+          absolute: [],
+          relative: []
+        };
+      }
+      assigneeTotal = (points[sprintName][assigneeEmail] || {}).total || {
+        absolute: 0,
+        relative: 0,
+      };
+      assigneeTotals[assigneeName].absolute.push(assigneeTotal.absolute);
+      assigneeTotals[assigneeName].relative.push(assigneeTotal.relative);
+    }
+  }
+
+  var assigneeAverages = {};
+  var totalsCount, prunedAbsolute, prunedRelative;
+  var assigneeNames = Object.keys(assigneeTotals);
+  assigneeCount = assigneeNames.length;
+  for (i = 0; i < assigneeCount; ++i) {
+    assigneeName = assigneeNames[i];
+    totalsCount = assigneeTotals[assigneeName].absolute.length;
+    prunedAbsolute = pruneOutliers(assigneeTotals[assigneeName].absolute);
+    prunedRelative = pruneOutliers(assigneeTotals[assigneeName].relative);
+    assigneeAverages[assigneeName] = {
+      absolute: {
+        mean: mean(prunedAbsolute),
+        stdev: standardDeviation(prunedAbsolute)
+      },
+      relative: {
+        mean: mean(prunedRelative),
+        stdev: standardDeviation(prunedRelative)
+      }
+    };
+  }
+
+  var futurePoints = {};
+  var tableRowOffset = startRow + CHART_ROWSPAN;
+  var sprintColumn;
+  for (i = 0; i < futureSprintCount; ++i) {
+    sprintName = futureSprints[i];
+    sprintColumn = i + 2;
+    sheet.getRange(tableRowOffset, sprintColumn).setValue(sprintName);
+
+    futurePoints[sprintName] = {};
+    var teamName, teamPoints, teamCommitments, teamRow;
+    for (j = 0; j < forecastTeamCount; ++j) {
+      teamName = forecastTeams.active[j];
+      teamRow = tableRowOffset + (j * 2);
+      sheet.getRange(teamRow + 1, 1).setValue(teamName + " - " + COLUMN_LABELS.absolute);
+      sheet.getRange(teamRow + 2, 1).setValue(teamName + " - " + COLUMN_LABELS.relative);
+      sheet.hideRows(teamRow + 2);
+
+      teamPoints = futurePoints[sprintName][teamName] = {
+        absolute: 0,
+        relative: 0
+      };
+      assigneeNames = teamName.split(/\s*,\s*/);
+      teamCommitments = getTeamCommitments(forecastTeams.commitments, assigneeNames);
+
+      var assigneeEmail, assigneeAvailability, commitment, assigneePoints, pointsTillNow;
+      for (var k = 0, l2 = assigneeNames.length; k < l2; ++k) {
+        assigneeName = assigneeNames[k];
+        assigneeEmail = getAssigneeEmail(assigneeName, team);
+        assigneeAvailability = 1 + (1 - getAvailability(assigneeName, sprintName, team));
+        commitment = teamCommitments[assigneeName] / 100;
+        // First capture the points that are already handled this sprint.
+        pointsTillNow = (points[sprintName] && (points[sprintName][assigneeEmail] || {}).total) || {
+          absolute: 0,
+          relative: 0
+        };
+
+        assigneePoints = assigneeAverages[assigneeName];
+        teamPoints.absolute += (assigneePoints.absolute.mean - pointsTillNow.absolute);
+        teamPoints.relative += (((assigneePoints.relative.mean * assigneeAvailability) * commitment)
+          - pointsTillNow.relative);
+
+        sheet.getRange(teamRow + 1, sprintColumn).setValue(teamPoints.absolute);
+        sheet.getRange(teamRow + 2, sprintColumn).setValue(teamPoints.relative);
+      }
+    }
+  }
+
+  addForecastCharts(sheet, futurePoints, forecastTeams, startRow);
+
+  return CHART_ROWSPAN + (forecastTeamCount * 2) + 2;
+}
+
+function addForecastCharts(sheet, futurePoints, forecastTeams, startRow) {
+  var sprintCount = Object.keys(futurePoints).length;
+  var teamCount = forecastTeams.active.length;
+  var tableRowOffset = startRow + CHART_ROWSPAN;
+
+  var chart = sheet.newChart()
+    .asAreaChart()
+    .addRange(sheet.getRange(getR1C1(2, tableRowOffset, sprintCount + 1, tableRowOffset)));
+
+  for (var teamRow, i = 0; i < teamCount; ++i) {
+    teamRow = tableRowOffset + (i * 2);
+    chart.addRange(sheet.getRange(getR1C1(1, teamRow + 1, sprintCount + 1, teamRow + 1)))
+         .addRange(sheet.getRange(getR1C1(1, teamRow + 2, sprintCount + 1, teamRow + 2)));
+  }
+
+  chart
+    .setNumHeaders(1)
+    .setMergeStrategy(Charts.ChartMergeStrategy.MERGE_ROWS)
+    .setHiddenDimensionStrategy(Charts.ChartHiddenDimensionStrategy.SHOW_BOTH)
+    .setTransposeRowsAndColumns(true)
+    .setXAxisTitle(COLUMN_LABELS.sprints)
+    .setYAxisTitle(COLUMN_LABELS.points)
+    .setPosition(startRow, 2, 0, 0);
+  sheet.insertChart(chart.build());
 }
