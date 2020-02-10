@@ -1,0 +1,15 @@
+{
+  "name": "gdocs-scripts",
+  "description": "Collection of scripts for GSuite that I've found to be useful over time.",
+  "version": "0.0.1",
+  "repository": "https://github.com/mikedeboer/gdocs-scripts",
+  "license": "MIT",
+  "engines": {
+    "node": ">=12.10.0"
+  },
+  "dependencies": {
+    "commander": "^4.1.1",
+    "css": "^2.2.4",
+    "highlight.js": "^9.18.1"
+  }
+}
