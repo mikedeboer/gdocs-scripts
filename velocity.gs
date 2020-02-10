@@ -127,7 +127,7 @@ function getPoints(root, team) {
           if (!pointsMap[currentSprint][assigneeEmail].total) {
             pointsMap[currentSprint][assigneeEmail].total = {
               absolute: 0,
-              relativeQuotient: (1 + (1 - getAvailability(assigneeName, currentSprint, team)))
+              availabilityQuotient: (1 + (1 - getAvailability(assigneeName, currentSprint, team)))
             };
           }
           pointsMap[currentSprint][assigneeEmail].total.absolute += points;
@@ -257,12 +257,12 @@ function addIndividualsSection(sheet, points, team, teamData, startRow) {
 
       var pointsTotal = points[sprintName][assigneeEmail].total || {
         absolute: 0,
-        relativeQuotient: 1
+        availabilityQuotient: 1
       };
       sheet.getRange(tableStartRow + j, sprintColumn, 1, 1).setValue(pointsTotal.absolute);
       // Also set the values for the table with relative velocity.
       sheet.getRange(relativeVelocityTableStartRow + j, sprintColumn, 1, 1)
-        .setValue(pointsTotal.absolute * pointsTotal.relativeQuotient);
+        .setValue(pointsTotal.absolute * pointsTotal.availabilityQuotient);
     }
   }
 
@@ -290,9 +290,8 @@ function drawIndividualsCharts(sheet, points, team, teamData, tableStartRow) {
     .setTransposeRowsAndColumns(true)
     .setXAxisTitle(COLUMN_LABELS.sprints)
     .setYAxisTitle(COLUMN_LABELS.points)
-    .setPosition(tableStartRow - (assigneeEmailsCount * 2) - chartsOffset, 2, 0, 0)
-    .build();
-  sheet.insertChart(chart);
+    .setPosition(tableStartRow - (assigneeEmailsCount * 2) - chartsOffset, 2, 0, 0);
+  sheet.insertChart(chart.build());
 
   // Next, chart out the developments per assignee.
   chart = sheet.newChart()
@@ -300,9 +299,8 @@ function drawIndividualsCharts(sheet, points, team, teamData, tableStartRow) {
     .addRange(sheet.getRange(getR1C1(1, tableStartRow, 1, tableStartRow + assigneeEmailsCount - 1)))
     .addRange(sheet.getRange(getR1C1(totalColumn, tableStartRow, totalColumn,
       tableStartRow + assigneeEmailsCount - 1)))
-    .setPosition(tableStartRow - (assigneeEmailsCount * 2) - chartsOffset, 9, 0, 0)
-    .build();
-  sheet.insertChart(chart);
+    .setPosition(tableStartRow - (assigneeEmailsCount * 2) - chartsOffset, 9, 0, 0);
+  sheet.insertChart(chart.build());
 
   return sheet;
 }
@@ -314,7 +312,8 @@ function addTeamsSection(sheet, points, team, teamData, startRow) {
   var sprintNames = Object.keys(points);
   var sprintCount = sprintNames.length;
   var visitedRanges = {};
-  var teamCalcColumns = {};
+  var teamSprintData = {};
+  var teamsCommittedCount = 0;
   var range, sprintName, sprintColumn;
   for (var i = 0; i < sprintCount; ++i) {
     sprintName = sprintNames[i];
@@ -345,8 +344,8 @@ function addTeamsSection(sheet, points, team, teamData, startRow) {
       teamRow = tableRowOffset + j + 1;
       // If this team was active during this sprint, get its relative velocity.
       if (teamData.sprints[sprintName] && teamData.sprints[sprintName].active.indexOf(teamName) != -1) {
-        if (!teamCalcColumns[teamName]) {
-          teamCalcColumns[teamName] = [];
+        if (!teamSprintData[teamName]) {
+          teamSprintData[teamName] = [];
         }
         if (!visitedRanges[teamRow + ",1"]) {
           sheet.getRange(teamRow, 1, 1, 1).setValue(teamName);
@@ -383,16 +382,23 @@ function addTeamsSection(sheet, points, team, teamData, startRow) {
 
       sheet.getRange(teamRow, sprintColumn, 1, 1).setValue(teamPoints);
       if (teamPoints) {
-        teamCalcColumns[teamName].push(teamPoints);
+        teamSprintData[teamName].push({
+          points: teamPoints,
+          sprintName: sprintName,
+          pointsCommitted: teamData.sprints[sprintName].pointsCommitted[teamName] || 0
+        });
       }
     }
   }
 
   // Add totals to the calculations table.
-  for (var pointsCount, p = 0; p < teamCount; ++p) {
+  var pointsCount;
+  for (p = 0; p < teamCount; ++p) {
     teamRow = (tableRowOffset - teamCount) + p;
     teamName = teamData.names[p];
-    teamPoints = pruneOutliers(teamCalcColumns[teamName]);
+    teamPoints = pruneOutliers(teamSprintData[teamName].map(function(o) {
+      return o.points;
+    }));
     pointsCount = teamPoints.length;
     for (var q = 0; q < pointsCount; ++q) {
       sheet.getRange(teamRow, q + 2, 1, 1).setValue(teamPoints[q]);
@@ -417,10 +423,34 @@ function addTeamsSection(sheet, points, team, teamData, startRow) {
       sheet.getRange(teamRow, totalColumn + 2).setValue(0);
       sheet.getRange(teamRow, totalColumn + 4).setValue(0);
     }
+
+    // Now check the points that we registered with the amount that the team
+    // committed to, during the sprint planning (before the sprint started).
+    teamPoints = teamSprintData[teamName].filter(function(o) {
+      return !!o.pointsCommitted && !!o.points;
+    });
+    pointsCount = teamPoints.length;
+    if (!pointsCount) {
+      continue;
+    }
+    ++teamsCommittedCount
+    var estimationRating;
+    for (i = 0; i < pointsCount; ++i) {
+      teamRow = tableRowOffset + teamCount + teamsCommittedCount + 5;
+      sprintColumn = sprintNames.indexOf(teamPoints[i].sprintName) + 2;
+      range = teamRow + ",1";
+      if (!visitedRanges[range]) {
+        sheet.getRange(teamRow, 1).setValue(teamName);
+      }
+      Logger.log("CALC:: " + teamPoints[i].points + ", " + teamPoints[i].pointsCommitted);
+      estimationRating = ((teamPoints[i].points - teamPoints[i].pointsCommitted)
+        / teamPoints[i].pointsCommitted) * 100;
+      sheet.getRange(teamRow, sprintColumn).setValue(estimationRating.toFixed(2));
+    }
   }
 
   addTeamCharts(sheet, points, team, teamData, startRow);
-  return CHART_ROWSPAN + (teamCount * 2) + 6;
+  return CHART_ROWSPAN + (teamCount * 2) + teamsCommittedCount + 7;
 }
 
 function addTeamCharts(sheet, points, team, teamData, startRow) {
@@ -444,9 +474,8 @@ function addTeamCharts(sheet, points, team, teamData, startRow) {
     .setHiddenDimensionStrategy(Charts.ChartHiddenDimensionStrategy.SHOW_BOTH)
     .setXAxisTitle(COLUMN_LABELS.teams)
     .setYAxisTitle(COLUMN_LABELS.points)
-    .setPosition(startRow, 2, 0, 0)
-    .build();
-  sheet.insertChart(chart);
+    .setPosition(startRow, 2, 0, 0);
+  sheet.insertChart(chart.build());
 
   return sheet;
 }
@@ -487,10 +516,10 @@ function addForecastsSection(sheet, points, team, teamData, startRow) {
       }
       assigneeTotal = (points[sprintName][assigneeEmail] || {}).total || {
         absolute: 0,
-        relativeQuotient: 1,
+        availabilityQuotient: 1,
       };
       assigneeTotals[assigneeName].absolute.push(assigneeTotal.absolute);
-      assigneeTotals[assigneeName].relative.push(assigneeTotal.absolute / assigneeTotal.relativeQuotient);
+      assigneeTotals[assigneeName].relative.push(assigneeTotal.absolute / assigneeTotal.availabilityQuotient);
     }
   }
 
@@ -548,14 +577,14 @@ function addForecastsSection(sheet, points, team, teamData, startRow) {
         // First capture the points that are already handled this sprint.
         pointsTillNow = (points[sprintName] && (points[sprintName][assigneeEmail] || {}).total) || {
           absolute: 0,
-          relativeQuotient: 1
+          availabilityQuotient: 1
         };
 
         assigneePoints = assigneeAverages[assigneeName];
         teamPoints.absolute += (((assigneePoints.absolute.mean / assigneeAvailability) / commitment)
           - pointsTillNow.absolute);
         teamPoints.relative += (((assigneePoints.relative.mean / assigneeAvailability) / commitment)
-          - pointsTillNow.absolute * pointsTillNow.relativeQuotient);
+          - pointsTillNow.absolute * pointsTillNow.availabilityQuotient);
 
         sheet.getRange(teamRow + 1, sprintColumn).setValue(teamPoints.absolute);
         sheet.getRange(teamRow + 2, sprintColumn).setValue(teamPoints.relative);
