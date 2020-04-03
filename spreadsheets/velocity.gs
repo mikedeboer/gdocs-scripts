@@ -14,6 +14,21 @@ var COLUMN_LABELS = {
 };
 var CHART_ROWSPAN = 19;
 
+var DEBUG = false;
+function LOG(...args) {
+  if (!DEBUG) {
+    return;
+  }
+  Logger.log(...args.map(a => {
+    if (typeof a == "object") {
+      try {
+        return "\n" + JSON.stringify(a, null, 2) + "\n";
+      } catch (ex) {}
+    }
+    return " " + a
+  }));
+}
+
 function generateVelocity() {
   var team = getTeam();
   var url = "https://bugzilla.mozilla.org/report.cgi?"
@@ -142,10 +157,13 @@ function getPoints(root, team) {
 }
 
 function generateSheet(points, team, teamData) {
+  // LOG("Generating sheet with data:", points, team, teamData);
   var spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
   var sheetName = "Velocity - generated at " + (new Date()).toDateString();
   var sheet = spreadsheet.getSheetByName(sheetName);
+  LOG("Sheet name", sheetName);
   if (sheet) {
+    LOG("Sheet", sheetName, "already exists, removing it first");
     spreadsheet.deleteSheet(sheet);
   }
   sheet = spreadsheet.insertSheet(sheetName);
@@ -177,8 +195,11 @@ function generateSheet(points, team, teamData) {
   sheet.hideColumns(totalColumn + 4);
 
   var rowSpan = addForecastsSection(sheet, points, team, teamData, startRow);
+  LOG("Rowspan after adding forecasts section:", rowSpan);
   rowSpan += addTeamsSection(sheet, points, team, teamData, startRow + rowSpan);
+  LOG("Rowspan after adding teams section:", rowSpan);
   rowSpan += addIndividualsSection(sheet, points, team, teamData, startRow + rowSpan);
+  LOG("Rowspan after adding individuals section:", rowSpan);
 }
 
 function addIndividualsSection(sheet, points, team, teamData, startRow) {
@@ -371,7 +392,7 @@ function addTeamsSection(sheet, points, team, teamData, startRow) {
           commitment = teamCommitments[assigneeName] / 100;
           pointsTotal = (points[sprintName][getAssigneeEmail(assigneeName, team)] || {}).total;
           if (!pointsTotal) {
-            Logger.log("No data found for " + sprintName + ":" + assigneeName);
+            LOG("No data found for", sprintName, assigneeName);
             continue;
           }
 
@@ -442,7 +463,7 @@ function addTeamsSection(sheet, points, team, teamData, startRow) {
       if (!visitedRanges[range]) {
         sheet.getRange(teamRow, 1).setValue(teamName);
       }
-      Logger.log("CALC:: " + teamPoints[i].points + ", " + teamPoints[i].pointsCommitted);
+      LOG("CALC::", teamPoints[i].points, teamPoints[i].pointsCommitted);
       estimationRating = ((teamPoints[i].points - teamPoints[i].pointsCommitted)
         / teamPoints[i].pointsCommitted) * 100;
       sheet.getRange(teamRow, sprintColumn).setValue(estimationRating.toFixed(2));
@@ -482,6 +503,7 @@ function addTeamCharts(sheet, points, team, teamData, startRow) {
 
 function addForecastsSection(sheet, points, team, teamData, startRow) {
   var forecastTeams = getForecastTeams();
+  LOG("Forecast teams", forecastTeams);
   var forecastTeamCount = forecastTeams.active.length;
   var sprintNames = Object.keys(points);
   var allSprints = getAllSprints();
@@ -522,6 +544,7 @@ function addForecastsSection(sheet, points, team, teamData, startRow) {
       assigneeTotals[assigneeName].relative.push(assigneeTotal.absolute / assigneeTotal.availabilityQuotient);
     }
   }
+  LOG("Average velocity numbers::totals", assigneeTotals);
 
   var assigneeAverages = {};
   var totalsCount, prunedAbsolute, prunedRelative;
@@ -543,6 +566,7 @@ function addForecastsSection(sheet, points, team, teamData, startRow) {
       }
     };
   }
+  LOG("Average velocity numbers::weighted and pruned", assigneeAverages);
 
   var futurePoints = {};
   var tableRowOffset = startRow + CHART_ROWSPAN;

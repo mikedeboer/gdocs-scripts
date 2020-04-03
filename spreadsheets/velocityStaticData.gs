@@ -31,7 +31,11 @@ function getTeam() {
   var endRow = sheet.createTextFinder("Team compositions").findNext().getRow() - 1;
   var team = {};
   for (var row = 4; row < endRow; ++row) {
-    team[getStaticCellValue(sheet, row, 3).trim()] = {
+    let email = getStaticCellValue(sheet, row, 3).trim();
+    if (!email) {
+      continue;
+    }
+    team[email] = {
       name: getStaticCellValue(sheet, row, 2).trim(),
       country: getStaticCellValue(sheet, row, 4).trim(),
       workWeek: getStaticCellValue(sheet, row, 5)
@@ -47,8 +51,7 @@ function getAllSprints() {
   }
 
   var sheet = getStaticDataSheet();
-  var startRange = sheet.createTextFinder("Team compositions").findNext();
-  var startRow = startRange.getRow() + 2;
+  var startRow = sheet.createTextFinder("Team compositions").findNext().getRow() - 1;
   var startColumn = 2;
   var endColumn, value;
   var currentColumn = startColumn;
@@ -118,6 +121,7 @@ function getAvailabilityPerCountry(team, sprints) {
       countryData[countryName][sprints[k]] = (getStaticCellValue(sheet, j, k + 2) || 0);
     }
   }
+  LOG("Country data", countryData);
   return countryData;
 }
 
@@ -176,7 +180,7 @@ function parseTeamsLine(line, sprintIndex, allTeamNames) {
 
 function getTeamData() {
   var sheet = getStaticDataSheet();
-  var dataRow = sheet.createTextFinder("Team compositions").findNext().getRow() + 3;
+  var dataRow = sheet.createTextFinder("Team compositions").findNext().getRow();
 
   var sprints = getAllSprints();
   var sprintData = {};
@@ -190,9 +194,11 @@ function getTeamData() {
     // addSprintPointsCommitted(sprintData[sprints[i]], i);
   }
 
+
   return {
     sprints: sprintData,
     names: allTeamNames.sort().sort(function(a, b) {
+      // We're sorting by the amount of people in a team, by counting the commas.
       return (b.match(/,/g) || []).length - (a.match(/,/g) || []).length;
     })
   };
