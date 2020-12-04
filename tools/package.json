@@ -10,6 +10,6 @@
   "dependencies": {
     "commander": "^4.1.1",
     "css": "^2.2.4",
-    "highlight.js": "^9.18.1"
+    "highlight.js": "^10.4.1"
   }
 }
